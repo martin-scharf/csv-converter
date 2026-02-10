@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CSV Konverter - Bestelldaten</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      min-height: 100vh;
+      color: #fff;
+      padding: 40px 20px;
+    }
+    
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    
+    h1 {
+      text-align: center;
+      margin-bottom: 10px;
+      font-size: 2rem;
+    }
+    
+    .subtitle {
+      text-align: center;
+      color: #888;
+      margin-bottom: 40px;
+    }
+    
+    .drop-zone {
+      border: 3px dashed #444;
+      border-radius: 20px;
+      padding: 60px 40px;
+      text-align: center;
+      transition: all 0.3s ease;
+      cursor: pointer;
+      background: rgba(255,255,255,0.02);
+    }
+    
+    .drop-zone:hover,
+    .drop-zone.dragover {
+      border-color: #4CAF50;
+      background: rgba(76, 175, 80, 0.1);
+    }
+    
+    .drop-zone-icon {
+      font-size: 4rem;
+      margin-bottom: 20px;
+    }
+    
+    .drop-zone-text {
+      font-size: 1.2rem;
+      color: #aaa;
+    }
+    
+    .drop-zone-hint {
+      font-size: 0.9rem;
+      color: #666;
+      margin-top: 10px;
+    }
+    
+    #fileInput {
+      display: none;
+    }
+    
+    .result {
+      margin-top: 30px;
+      display: none;
+    }
+    
+    .result.show {
+      display: block;
+    }
+    
+    .result-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+    
+    .result-info {
+      color: #4CAF50;
+      font-weight: 500;
+    }
+    
+    .download-btn {
+      background: #4CAF50;
+      color: #fff;
+      border: none;
+      padding: 12px 30px;
+      border-radius: 10px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    
+    .download-btn:hover {
+      background: #45a049;
+    }
+    
+    .preview {
+      background: rgba(0,0,0,0.3);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    
+    .preview-title {
+      background: rgba(0,0,0,0.3);
+      padding: 10px 15px;
+      font-weight: 500;
+      color: #888;
+    }
+    
+    .preview-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    
+    .preview-table th,
+    .preview-table td {
+      padding: 10px 15px;
+      text-align: left;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    
+    .preview-table th {
+      background: rgba(76, 175, 80, 0.2);
+      color: #4CAF50;
+    }
+    
+    .preview-table tr:last-child td {
+      border-bottom: none;
+    }
+    
+    .preview-more {
+      padding: 10px 15px;
+      color: #666;
+      font-style: italic;
+    }
+    
+    .error {
+      background: rgba(244, 67, 54, 0.2);
+      border: 1px solid #f44336;
+      color: #f44336;
+      padding: 15px 20px;
+      border-radius: 10px;
+      margin-top: 20px;
+      display: none;
+    }
+    
+    .error.show {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>CSV Konverter</h1>
+    <p class="subtitle">Bestelldaten umwandeln: LNR-Bestellnummer + Menge</p>
+    
+    <div class="drop-zone" id="dropZone">
+      <div class="drop-zone-icon">📄</div>
+      <div class="drop-zone-text">CSV-Datei hier ablegen</div>
+      <div class="drop-zone-hint">oder klicken zum Auswählen</div>
+    </div>
+    <input type="file" id="fileInput" accept=".csv">
+    
+    <div class="error" id="error"></div>
+    
+    <div class="result" id="result">
+      <div class="result-header">
+        <span class="result-info" id="resultInfo"></span>
+        <button class="download-btn" id="downloadBtn">Download CSV</button>
+      </div>
+      <div class="preview">
+        <div class="preview-title">Vorschau (erste 10 Zeilen)</div>
+        <table class="preview-table">
+          <thead>
+            <tr>
+              <th>Bestellnummer</th>
+              <th>Menge</th>
+            </tr>
+          </thead>
+          <tbody id="previewBody"></tbody>
+        </table>
+        <div class="preview-more" id="previewMore"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const result = document.getElementById('result');
+    const resultInfo = document.getElementById('resultInfo');
+    const previewBody = document.getElementById('previewBody');
+    const previewMore = document.getElementById('previewMore');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const errorDiv = document.getElementById('error');
+    
+    let convertedData = null;
+    let originalFilename = '';
+    
+    // Drag & Drop Events
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+    
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('dragover');
+    });
+    
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      const file = e.dataTransfer.files[0];
+      if (file) processFile(file);
+    });
+    
+    dropZone.addEventListener('click', () => {
+      fileInput.click();
+    });
+    
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) processFile(file);
+    });
+    
+    function processFile(file) {
+      errorDiv.classList.remove('show');
+      result.classList.remove('show');
+      
+      if (!file.name.endsWith('.csv')) {
+        showError('Bitte eine CSV-Datei auswählen');
+        return;
+      }
+      
+      originalFilename = file.name.replace('.csv', '');
+      
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          convertCSV(e.target.result);
+        } catch (err) {
+          showError('Fehler beim Verarbeiten: ' + err.message);
+        }
+      };
+      reader.readAsText(file, 'ISO-8859-1'); // Windows encoding for German files
+    }
+    
+    function convertCSV(csvText) {
+      const lines = csvText.trim().split('\n');
+      if (lines.length < 2) {
+        showError('CSV-Datei ist leer oder hat keine Daten');
+        return;
+      }
+      
+      // Parse header
+      const header = lines[0].split(';').map(h => h.trim());
+      
+      // Find column indices
+      const lnrIndex = header.findIndex(h => h === 'LNR-Bestellnummer');
+      const mengeIndex = header.findIndex(h => h === 'Bestellmenge');
+      
+      if (lnrIndex === -1) {
+        showError('Spalte "LNR-Bestellnummer" nicht gefunden');
+        return;
+      }
+      if (mengeIndex === -1) {
+        showError('Spalte "Bestellmenge" nicht gefunden');
+        return;
+      }
+      
+      // Convert data
+      const outputRows = [];
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        
+        const cols = line.split(';');
+        const bestellnummer = cols[lnrIndex]?.trim() || '';
+        let menge = cols[mengeIndex]?.trim() || '0';
+        
+        // Convert German number format (1,00 -> 1)
+        menge = menge.replace(',', '.');
+        menge = Math.round(parseFloat(menge) || 0).toString();
+        
+        if (bestellnummer) {
+          outputRows.push({ bestellnummer, menge });
+        }
+      }
+      
+      if (outputRows.length === 0) {
+        showError('Keine gültigen Daten gefunden');
+        return;
+      }
+      
+      // Store for download
+      convertedData = outputRows;
+      
+      // Show result
+      resultInfo.textContent = `${outputRows.length} Zeilen konvertiert`;
+      
+      // Preview (first 10)
+      previewBody.innerHTML = '';
+      const previewCount = Math.min(10, outputRows.length);
+      for (let i = 0; i < previewCount; i++) {
+        const row = outputRows[i];
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${row.bestellnummer}</td><td>${row.menge}</td>`;
+        previewBody.appendChild(tr);
+      }
+      
+      if (outputRows.length > 10) {
+        previewMore.textContent = `... und ${outputRows.length - 10} weitere Zeilen`;
+      } else {
+        previewMore.textContent = '';
+      }
+      
+      result.classList.add('show');
+    }
+    
+    function showError(message) {
+      errorDiv.textContent = message;
+      errorDiv.classList.add('show');
+    }
+    
+    downloadBtn.addEventListener('click', () => {
+      if (!convertedData) return;
+      
+      // Build CSV
+      let csv = 'Bestellnummer;Menge\n';
+      for (const row of convertedData) {
+        csv += `${row.bestellnummer};${row.menge}\n`;
+      }
+      
+      // Download
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${originalFilename}_konvertiert.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  </script>
+</body>
+</html>
