@@ -173,7 +173,7 @@
       <div class="drop-zone-text">CSV-Datei hier ablegen</div>
       <div class="drop-zone-hint">oder klicken zum Auswählen</div>
     </div>
-    <input type="file" id="fileInput" accept=".csv">
+    <input type="file" id="fileInput" accept=".csv,.CSV,.txt,.TXT">
     
     <div class="error" id="error"></div>
     
@@ -241,12 +241,13 @@
       errorDiv.classList.remove('show');
       result.classList.remove('show');
       
-      if (!file.name.endsWith('.csv')) {
-        showError('Bitte eine CSV-Datei auswählen');
+      var lowerName = file.name.toLowerCase();
+      if (!lowerName.endsWith('.csv') && !lowerName.endsWith('.txt')) {
+        showError('Bitte eine CSV- oder TXT-Datei auswählen');
         return;
       }
       
-      originalFilename = file.name.replace('.csv', '');
+      originalFilename = file.name.replace(/\.(csv|txt)$/i, '');
       
       const reader = new FileReader();
       reader.onload = (e) => {
